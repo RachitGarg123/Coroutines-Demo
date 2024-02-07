@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Demo Project</string>
+    <string name="coroutines">Coroutines</string>
+    <string name="click">Click</string>
+    <string name="max_char_in_edittext_space">%1$d/%2$d </string>
+    <string name="ride_graph_time_stamp">%1$s,</string>
+    <string name="concatinate_strings">%1$s%2$s</string>
+</resources>
