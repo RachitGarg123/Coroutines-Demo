@@ -6,12 +6,15 @@ import androidx.annotation.RequiresApi
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
@@ -19,6 +22,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 import java.lang.RuntimeException
 import kotlin.coroutines.suspendCoroutine
 
@@ -26,12 +31,57 @@ import java.util.*
 
 class MainViewModel: ViewModel() {
 
+    private var job = SupervisorJob()
     fun hitApi() {
+/*         launch is a Coroutine Builder which is known as fire and forgot as it returns a job instance
+          which is used to control lifecycle of the coroutine whereas async returns a deferred type object
+          which is inherited from the job object only but can also return a value using .await() operator */
         viewModelScope.launch {
             waitForIt()
+            task1()
+/*             here yield should be used instead of ensureActive() and isActive as yield opens a suspension point
+             and immediately resumes it which allows others tasks to run and de-prioritize our current tasks*/
+            yield()
+            task2()
+            task3()
+            cancel() // cancels the job
+            withContext(NonCancellable) {
+                //handle what should be done in between cancelling and cancelled state
+            }
+            ensureActive() // or if(isActive) ensureActive() throws cancellationException, isActive does not
+            task4()
+            val parentJob = CoroutineScope(CoroutineName("SuperVisorParentJob")+SupervisorJob()+IO).launch {// here CoroutineName is used. It can help in debugging purposes in logcat.
+                val childJobOne = launch {
+                    // doing some work
+                }
+                val childJobTwo = launch {
+                    // doing some work
+                }
+                childJobOne.cancel() // cancelling one childJob does not cancel the siblings or the parent job
+            }
         }
     }
 
+    private suspend fun task1() = withContext(Dispatchers.Default) { // In Dispatchers.Default one micro-processor(C.P.U) is allocated to each task with a min. of 2 threads
+        //CPU Intensive task
+    }
+
+    private suspend fun task2() = withContext(Dispatchers.Default) {
+        //CPU Intensive task
+    }
+
+    private suspend fun task3() = withContext(IO){// used for network and Database related tasks. By default IO thread pool has 64 threads
+
+    }
+
+    private suspend fun task4() = withContext(IO.limitedParallelism(parallelism = 5)) { // limitedParallelism is used to limit the no. of parallel threads
+
+    }
+
+    // This is a suspend function, a parameter is passed internally of continuation object which holds all the data used in this function.
+    // Also, it has a variable by the name of label which represents the state of the function whether it is suspended currently or not
+    // If it is currently suspended then a constant is returned i.e COROUTINE_SUSPENDED
+    //
     private suspend fun waitForIt() {
         var a = 10
         Log.i("1 Value of a", "a---> $a")
@@ -114,5 +164,5 @@ class MainViewModel: ViewModel() {
  -- IO thread normally has 64 threads present in it to perform multi-tasks
  -- We can also limit the no of parallel threads by using Dispatchers.{$Thread_Pool_Name}.limitedParallelism(${number})
  -- There is one Dispatcher which should be avoided in most cases Dispatcher.UNCONFINED {it does not guarantee that the coroutine will resume on the same thread in which it is started}
- -- unlike isActive ensureActive() throws a cancellationException is a job is not active we can catch that exception in the try catch block
+ -- unlike isActive ensureActive() throws a cancellationException if a job is not active we can catch that exception in the try catch block
 */
